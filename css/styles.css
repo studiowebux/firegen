@@ -301,6 +301,36 @@ body {
   font-size: 0.6875rem;
 }
 
+/* Autocomplete hints */
+
+.CodeMirror-hints {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 0.25rem 0;
+  z-index: 100;
+}
+
+.CodeMirror-hint {
+  padding: 0.25rem 0.625rem;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+li.CodeMirror-hint-active {
+  background: var(--surface);
+  color: var(--text);
+}
+
+[data-theme="dark"] .CodeMirror-hints {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 /* Responsive */
 
 @media (max-width: 768px) {

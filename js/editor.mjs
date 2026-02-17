@@ -1,6 +1,11 @@
 // Pattern: Adapter — wraps CodeMirror 5 global into a module interface
 
+import { registerYamlHint } from "./yaml-hint.mjs";
+
 let editorInstance = null;
+
+// Register the YAML hint helper once at module load
+registerYamlHint();
 
 /**
  * Initialize CodeMirror on the given container element.
@@ -23,6 +28,7 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     tabSize: 2,
     indentWithTabs: false,
     placeholder: "# Enter your firewalld YAML configuration here...",
+    extraKeys: { "Ctrl-Space": "autocomplete" },
   });
 
   let debounceTimer = null;
@@ -35,6 +41,26 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
       }, debounceMs);
     });
   }
+
+  // Auto-trigger hints when typing at key positions
+  editorInstance.on("inputRead", (cm, change) => {
+    if (change.origin !== "+input") return;
+
+    const cursor = cm.getCursor();
+    const lineText = cm.getLine(cursor.line);
+    const beforeCursor = lineText.slice(0, cursor.ch);
+
+    // Trigger on variable reference: user typed "{"
+    if (beforeCursor.endsWith("{{ ") || beforeCursor.match(/\{\{\s*\w+$/)) {
+      cm.showHint({ completeSingle: false });
+      return;
+    }
+
+    // Trigger at key positions: line has only indent + word chars (no colon yet)
+    if (beforeCursor.match(/^\s*(-\s+)?[\w_]+$/) && !beforeCursor.includes(":")) {
+      cm.showHint({ completeSingle: false });
+    }
+  });
 
   return {
     getValue() {

@@ -1,38 +1,12 @@
 // Pattern: Facade — wraps js-yaml parsing with validation and template processing
 
 import { processTemplate } from "./template-engine.mjs";
-
-const VALID_ZONE_KEYS = new Set([
-  "target",
-  "interfaces",
-  "sources",
-  "services",
-  "ports",
-  "protocols",
-  "source_ports",
-  "rich_rules",
-  "forward",
-  "masquerade",
-  "forward_ports",
-  "icmp_blocks",
-  "icmp_block_inversion",
-]);
-
-const VALID_PORT_KEYS = new Set(["port", "protocol", "loop"]);
-const VALID_FORWARD_PORT_KEYS = new Set(["port", "protocol", "to_port", "to_addr", "loop"]);
-const VALID_RICH_RULE_KEYS = new Set([
-  "family", "source", "source_invert", "destination", "destination_invert",
-  "service", "port", "protocol", "icmp_block", "icmp_type", "masquerade",
-  "forward_port", "source_port", "log", "audit", "action", "reject_type",
-  "mark_set", "loop",
-]);
-const VALID_DIRECT_RULE_KEYS = new Set(["ipv", "table", "chain", "priority", "args", "loop"]);
-const VALID_DIRECT_CHAIN_KEYS = new Set(["ipv", "table", "chain"]);
-const VALID_PASSTHROUGH_KEYS = new Set(["ipv", "args", "loop"]);
-const VALID_RULE_GROUP_KEYS = new Set(["ipv", "table", "chain", "rules", "passthroughs"]);
-
-const VALID_DIRECT_KEYS = new Set(["chains", "rules", "passthroughs", "rule_groups"]);
-const VALID_TOP_KEYS = new Set(["variables", "zones", "direct"]);
+import {
+  VALID_TOP_KEYS, VALID_ZONE_KEYS, VALID_PORT_KEYS, VALID_FORWARD_PORT_KEYS,
+  VALID_RICH_RULE_KEYS, VALID_DIRECT_KEYS, VALID_DIRECT_RULE_KEYS,
+  VALID_DIRECT_CHAIN_KEYS, VALID_PASSTHROUGH_KEYS, VALID_RULE_GROUP_KEYS,
+  VALID_RULE_GROUP_RULE_KEYS, VALID_TARGETS,
+} from "./schema.mjs";
 
 /**
  * Levenshtein distance between two strings.
@@ -215,10 +189,9 @@ function validateZone(name, zone, errors, warnings) {
   const ctx = `Zone '${name}'`;
 
   if (zone.target !== undefined) {
-    const validTargets = ["default", "ACCEPT", "DROP", "REJECT"];
     const targetStr = String(zone.target);
-    if (!validTargets.includes(targetStr)) {
-      warnings.push(`${ctx}: target '${targetStr}' is not one of ${validTargets.join(", ")}`);
+    if (!VALID_TARGETS.includes(targetStr)) {
+      warnings.push(`${ctx}: target '${targetStr}' is not one of ${VALID_TARGETS.join(", ")}`);
     }
   }
 
@@ -352,8 +325,7 @@ function validateDirect(direct, errors, warnings) {
           if (group.rules !== undefined && Array.isArray(group.rules)) {
             for (const rule of group.rules) {
               if (rule !== null && typeof rule === "object") {
-                const validGroupRuleKeys = new Set(["priority", "args", "loop"]);
-                warnUnknownKeys("Direct rule_group rule", rule, validGroupRuleKeys, warnings);
+                warnUnknownKeys("Direct rule_group rule", rule, VALID_RULE_GROUP_RULE_KEYS, warnings);
                 if (rule.priority === undefined) {
                   warnings.push("Direct rule_group rule missing 'priority' field");
                 }
