@@ -27,5 +27,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Responsive layout for desktop and mobile
 - Docker deployment with nginx
 
-[Unreleased]: https://github.com/studiowebux/firewalld/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/studiowebux/firewalld/releases/tag/v1.0.0
+[Unreleased]: https://github.com/studiowebux/firegen/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/studiowebux/firegen/releases/tag/v1.0.0

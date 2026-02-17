@@ -2,7 +2,7 @@
 
 Declarative firewalld configuration generator. Write YAML, get `firewall-cmd` scripts.
 
-**Bug tracker:** [GitHub Issues](https://github.com/studiowebux/firewalld/issues) | **Discord:** [Join](https://discord.gg/BG5Erm9fNv)
+**Bug tracker:** [GitHub Issues](https://github.com/studiowebux/firegen/issues) | **Discord:** [Join](https://discord.gg/BG5Erm9fNv)
 
 **Funding:** [Buy Me a Coffee](https://buymeacoffee.com/studiowebux) | [GitHub Sponsors](https://github.com/sponsors/studiowebux) | [Patreon](https://patreon.com/studiowebux)
 
@@ -17,7 +17,7 @@ Runs entirely in the browser. No backend, no telemetry, no dependencies at runti
 ### From source
 
 ```sh
-git clone https://github.com/studiowebux/firewalld.git
+git clone https://github.com/studiowebux/firegen.git
 cd firewalld
 python3 -m http.server 8090
 ```
