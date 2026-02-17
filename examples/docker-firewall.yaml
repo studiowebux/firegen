@@ -1,0 +1,55 @@
+# Docker + SSH firewalld configuration
+# Full server state: public zone with DROP target, Docker network isolation, SSH access
+
+variables:
+  allowed_ssh_ip: x.y.z.w
+  docker_networks:
+    - 127.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+  public_ports:
+    - 80
+    - 443
+
+zones:
+  public:
+    target: DROP
+    interfaces:
+      - eno3
+    services:
+      - dhcpv6-client
+      - mdns
+      - ssh
+    ports:
+      - port: "{{ item }}"
+        protocol: tcp
+        loop: "{{ public_ports }}"
+    forward: true
+    rich_rules:
+      - family: ipv4
+        source: "{{ allowed_ssh_ip }}"
+        service: ssh
+        action: accept
+
+direct:
+  rule_groups:
+    # Shared rules for both IPv4 and IPv6
+    - ipv: [ipv4, ipv6]
+      table: filter
+      chain: DOCKER-USER
+      rules:
+        - priority: 1
+          args: "-m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+        - priority: 1
+          args: "-j RETURN -s {{ ipv_any }} -p tcp --dport {{ item }}"
+          loop: "{{ public_ports }}"
+        - priority: 10
+          args: "-j DROP"
+    # IPv4-only: allow Docker internal networks
+    - ipv: ipv4
+      table: filter
+      chain: DOCKER-USER
+      rules:
+        - priority: 1
+          args: "-j RETURN -s {{ item }}"
+          loop: "{{ docker_networks }}"
