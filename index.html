@@ -38,7 +38,15 @@
         </div>
       </div>
       <div id="editor-container"></div>
-      <div id="editor-errors" class="error-bar" hidden></div>
+      <div id="editor-errors" class="error-bar" hidden>
+        <div class="error-bar-summary">
+          <span class="error-bar-text"></span>
+          <button class="error-bar-toggle btn-icon" title="Toggle details">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="error-bar-details" hidden></div>
+      </div>
     </section>
 
     <section class="panel panel-output">

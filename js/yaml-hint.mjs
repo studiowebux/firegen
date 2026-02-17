@@ -8,127 +8,135 @@ import {
 } from "./schema.mjs";
 
 /**
- * Walk up from the cursor line to find parent and grandparent YAML keys
- * based on indentation levels.
+ * Get the effective indentation of a YAML line.
+ * For array items (`- key: val`), the key's effective indent is after the `- `.
+ */
+function getLineIndent(text) {
+  const rawIndent = text.search(/\S/);
+  if (rawIndent < 0) return { raw: -1, effective: -1, isArrayItem: false };
+
+  const trimmed = text.trimStart();
+  const isArrayItem = trimmed.startsWith("- ");
+
+  return {
+    raw: rawIndent,
+    effective: isArrayItem ? rawIndent + 2 : rawIndent,
+    isArrayItem,
+  };
+}
+
+/**
+ * Extract the YAML key name from a line, stripping array prefix if present.
+ * Returns null if line has no key.
+ */
+function extractKey(text) {
+  const trimmed = text.trimStart().replace(/^-\s*/, "");
+  const match = trimmed.match(/^([\w_]+)\s*:/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Walk up from the cursor line to build a context chain of ancestor keys.
+ * Returns { ancestors: string[], currentIndent: number }
  *
- * Returns { parentKey, grandparentKey, currentIndent }
+ * ancestors[0] = immediate parent key, ancestors[1] = grandparent, etc.
  */
 function getYamlContext(cm) {
   const cursor = cm.getCursor();
   const lineText = cm.getLine(cursor.line);
-  const currentIndent = lineText.search(/\S/);
+  const { effective: currentIndent } = getLineIndent(lineText);
 
-  // If cursor is at start of file or indent 0, we're at top level
-  if (currentIndent <= 0) {
-    return { parentKey: null, grandparentKey: null, currentIndent: 0 };
+  // Handle empty line: use cursor column as hint for intended indent
+  const effectiveCurrent = currentIndent >= 0 ? currentIndent : cursor.ch;
+
+  if (effectiveCurrent <= 0) {
+    return { ancestors: [], currentIndent: 0 };
   }
 
-  let parentKey = null;
-  let parentIndent = -1;
-  let grandparentKey = null;
+  const ancestors = [];
+  let searchBelow = effectiveCurrent;
 
-  // Walk up to find parent (first line with strictly less indentation)
   for (let i = cursor.line - 1; i >= 0; i--) {
     const text = cm.getLine(i);
-    const trimmed = text.trimStart();
+    const { raw, effective } = getLineIndent(text);
 
     // Skip blank lines and comments
-    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (raw < 0 || text.trimStart().startsWith("#")) continue;
 
-    const indent = text.search(/\S/);
+    // This line must have strictly less effective indentation than what we're searching for
+    if (effective < searchBelow) {
+      const key = extractKey(text);
+      if (key) {
+        ancestors.push(key);
+        searchBelow = raw < effective ? raw : effective;
 
-    // Strip array prefix for indent comparison
-    const effectiveIndent = trimmed.startsWith("- ") ? indent + 2 : indent;
-
-    if (indent < currentIndent) {
-      // Extract key name from this line
-      const keyMatch = trimmed.replace(/^-\s*/, "").match(/^([\w_]+)\s*:/);
-      if (keyMatch) {
-        if (parentKey === null) {
-          parentKey = keyMatch[1];
-          parentIndent = indent;
-        } else if (grandparentKey === null) {
-          grandparentKey = keyMatch[1];
-          break;
-        }
-      } else if (parentKey === null) {
-        // Line with less indent but no key (e.g., array scalar) — keep looking
-        continue;
-      }
-    }
-
-    // If we found parent, look for grandparent at even less indentation
-    if (parentKey !== null && grandparentKey === null && indent < parentIndent) {
-      const keyMatch = trimmed.replace(/^-\s*/, "").match(/^([\w_]+)\s*:/);
-      if (keyMatch) {
-        grandparentKey = keyMatch[1];
-        break;
+        // We only need parent + grandparent + great-grandparent at most
+        if (ancestors.length >= 3) break;
+        if (searchBelow <= 0) break;
       }
     }
   }
 
-  return { parentKey, grandparentKey, currentIndent };
+  return { ancestors, currentIndent: effectiveCurrent };
 }
 
 /**
  * Map YAML context to the appropriate set of valid keys.
  */
-function getKeysForContext(parentKey, grandparentKey) {
+function getKeysForContext(ancestors) {
+  const parent = ancestors[0] || null;
+  const grandparent = ancestors[1] || null;
+
   // Top level
-  if (parentKey === null) {
+  if (parent === null) {
     return VALID_TOP_KEYS;
   }
 
   // Under zones > <zone_name> — suggest zone keys
-  if (grandparentKey === "zones") {
+  if (grandparent === "zones" && parent !== "zones") {
     return VALID_ZONE_KEYS;
   }
 
-  // Under a zone's array fields
-  if (parentKey === "ports" || parentKey === "source_ports") {
-    return VALID_PORT_KEYS;
-  }
-  if (parentKey === "forward_ports") {
-    return VALID_FORWARD_PORT_KEYS;
-  }
-  if (parentKey === "rich_rules") {
-    return VALID_RICH_RULE_KEYS;
+  // Zone array fields
+  if (parentIsZoneArrayField(parent, ancestors)) {
+    if (parent === "ports" || parent === "source_ports") return VALID_PORT_KEYS;
+    if (parent === "forward_ports") return VALID_FORWARD_PORT_KEYS;
+    if (parent === "rich_rules") return VALID_RICH_RULE_KEYS;
   }
 
   // Direct block
-  if (parentKey === "direct") {
+  if (parent === "direct") {
     return VALID_DIRECT_KEYS;
   }
 
-  // Under direct arrays — disambiguate `rules` via grandparent
-  if (parentKey === "rules" && grandparentKey === "direct") {
-    return VALID_DIRECT_RULE_KEYS;
-  }
-  if (parentKey === "rules") {
-    // rules inside a rule_group
+  // Direct arrays — disambiguate `rules` via grandparent
+  if (parent === "rules") {
+    if (grandparent === "direct") return VALID_DIRECT_RULE_KEYS;
+    // rules inside a rule_group entry
     return VALID_RULE_GROUP_RULE_KEYS;
   }
-  if (parentKey === "chains") {
-    return VALID_DIRECT_CHAIN_KEYS;
-  }
-  if (parentKey === "passthroughs") {
-    return VALID_PASSTHROUGH_KEYS;
-  }
-  if (parentKey === "rule_groups") {
-    return VALID_RULE_GROUP_KEYS;
-  }
+  if (parent === "chains") return VALID_DIRECT_CHAIN_KEYS;
+  if (parent === "passthroughs") return VALID_PASSTHROUGH_KEYS;
+  if (parent === "rule_groups") return VALID_RULE_GROUP_KEYS;
 
-  // Under zones — zone names are user-defined, no suggestions
-  if (parentKey === "zones") {
-    return null;
-  }
-
+  // Under zones — zone names are user-defined
+  if (parent === "zones") return null;
   // Under variables — variable names are user-defined
-  if (parentKey === "variables") {
-    return null;
-  }
+  if (parent === "variables") return null;
 
   return null;
+}
+
+/**
+ * Check if parent is a zone array field by verifying the ancestor chain
+ * leads back through a zone name to `zones`.
+ */
+function parentIsZoneArrayField(parent, ancestors) {
+  const zoneArrayFields = ["ports", "source_ports", "forward_ports", "rich_rules", "icmp_blocks", "protocols", "interfaces", "sources", "services"];
+  if (!zoneArrayFields.includes(parent)) return false;
+
+  // grandparent should be a zone name, great-grandparent should be `zones`
+  return ancestors[2] === "zones" || ancestors[1] === "zones";
 }
 
 /**
@@ -139,7 +147,7 @@ function getPartialWord(cm) {
   const lineText = cm.getLine(cursor.line);
   const beforeCursor = lineText.slice(0, cursor.ch);
 
-  // Match the partial key name at end of line (after indent and optional `- `)
+  // Match the partial key name at end (after indent and optional `- `)
   const match = beforeCursor.match(/([\w_]*)$/);
   const word = match ? match[1] : "";
   const start = cursor.ch - word.length;
@@ -149,7 +157,6 @@ function getPartialWord(cm) {
 
 /**
  * Extract variable names from the editor content.
- * Quick regex scan of the variables block.
  */
 function extractVariableNames(cm) {
   const names = [];
@@ -168,11 +175,9 @@ function extractVariableNames(cm) {
 
     if (inVariables) {
       const indent = text.search(/\S/);
-      // Exited variables block
       if (indent >= 0 && indent <= variablesIndent && trimmed && !trimmed.startsWith("#")) {
         break;
       }
-      // Variable name line (direct child of variables)
       const varMatch = trimmed.match(/^([\w_]+)\s*:/);
       if (varMatch && indent > variablesIndent) {
         names.push(varMatch[1]);
@@ -191,7 +196,6 @@ function getVariableContext(cm) {
   const lineText = cm.getLine(cursor.line);
   const beforeCursor = lineText.slice(0, cursor.ch);
 
-  // Check for {{ at end, possibly with partial variable name
   const match = beforeCursor.match(/\{\{\s*([\w_]*)$/);
   if (match) {
     return { partial: match[1], start: cursor.ch - match[1].length };
@@ -201,20 +205,60 @@ function getVariableContext(cm) {
 }
 
 /**
- * Check if cursor is at a value position (after a colon) for target suggestions.
+ * Check if cursor is at a value position for target or boolean suggestions.
  */
-function getTargetContext(cm) {
+function getValueContext(cm) {
   const cursor = cm.getCursor();
   const lineText = cm.getLine(cursor.line);
   const beforeCursor = lineText.slice(0, cursor.ch);
 
-  const match = beforeCursor.match(/^\s*target\s*:\s*([\w]*)$/);
-  if (match) {
-    return { partial: match[1], start: cursor.ch - match[1].length };
+  // target: <value>
+  const targetMatch = beforeCursor.match(/^\s*target\s*:\s*([\w]*)$/);
+  if (targetMatch) {
+    return { type: "target", partial: targetMatch[1], start: cursor.ch - targetMatch[1].length };
+  }
+
+  // forward: <bool> or masquerade: <bool>
+  const boolMatch = beforeCursor.match(/^\s*(forward|masquerade|icmp_block_inversion)\s*:\s*([\w]*)$/);
+  if (boolMatch) {
+    return { type: "boolean", partial: boolMatch[2], start: cursor.ch - boolMatch[2].length };
+  }
+
+  // family: <value>
+  const familyMatch = beforeCursor.match(/^\s*family\s*:\s*([\w]*)$/);
+  if (familyMatch) {
+    return { type: "family", partial: familyMatch[1], start: cursor.ch - familyMatch[1].length };
+  }
+
+  // action: <value>
+  const actionMatch = beforeCursor.match(/^\s*action\s*:\s*([\w]*)$/);
+  if (actionMatch) {
+    return { type: "action", partial: actionMatch[1], start: cursor.ch - actionMatch[1].length };
+  }
+
+  // protocol: <value>
+  const protoMatch = beforeCursor.match(/^\s*protocol\s*:\s*([\w]*)$/);
+  if (protoMatch) {
+    return { type: "protocol", partial: protoMatch[1], start: cursor.ch - protoMatch[1].length };
+  }
+
+  // ipv: <value>
+  const ipvMatch = beforeCursor.match(/^\s*ipv\s*:\s*([\w]*)$/);
+  if (ipvMatch) {
+    return { type: "ipv", partial: ipvMatch[1], start: cursor.ch - ipvMatch[1].length };
   }
 
   return null;
 }
+
+const VALUE_OPTIONS = {
+  target: VALID_TARGETS,
+  boolean: ["true", "false"],
+  family: ["ipv4", "ipv6"],
+  action: ["accept", "reject", "drop", "mark"],
+  protocol: ["tcp", "udp", "sctp", "dccp"],
+  ipv: ["ipv4", "ipv6"],
+};
 
 /**
  * CM5 hint function for YAML firewalld configs.
@@ -222,7 +266,7 @@ function getTargetContext(cm) {
 function yamlHint(cm) {
   const cursor = cm.getCursor();
 
-  // Check for variable reference context first
+  // 1. Variable reference context
   const varCtx = getVariableContext(cm);
   if (varCtx) {
     const varNames = extractVariableNames(cm);
@@ -242,31 +286,31 @@ function yamlHint(cm) {
     };
   }
 
-  // Check for target value context
-  const targetCtx = getTargetContext(cm);
-  if (targetCtx) {
-    const filtered = VALID_TARGETS.filter((t) =>
-      t.toLowerCase().startsWith(targetCtx.partial.toLowerCase()),
+  // 2. Value context (target, boolean, family, action, protocol, ipv)
+  const valCtx = getValueContext(cm);
+  if (valCtx) {
+    const options = VALUE_OPTIONS[valCtx.type] || [];
+    const filtered = options.filter((v) =>
+      v.toLowerCase().startsWith(valCtx.partial.toLowerCase()),
     );
 
     if (filtered.length === 0) return null;
 
     return {
       list: filtered,
-      from: CodeMirror.Pos(cursor.line, targetCtx.start),
+      from: CodeMirror.Pos(cursor.line, valCtx.start),
       to: cursor,
     };
   }
 
-  // Key autocomplete based on context
-  const { parentKey, grandparentKey } = getYamlContext(cm);
-  const keys = getKeysForContext(parentKey, grandparentKey);
+  // 3. Key autocomplete based on YAML context
+  const { ancestors } = getYamlContext(cm);
+  const keys = getKeysForContext(ancestors);
 
   if (!keys) return null;
 
   const { word, start } = getPartialWord(cm);
 
-  // Filter keys by prefix match
   const filtered = [...keys].filter((k) =>
     k.toLowerCase().startsWith(word.toLowerCase()),
   );

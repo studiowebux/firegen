@@ -27,8 +27,19 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     lineWrapping: true,
     tabSize: 2,
     indentWithTabs: false,
+    indentUnit: 2,
     placeholder: "# Enter your firewalld YAML configuration here...",
-    extraKeys: { "Ctrl-Space": "autocomplete" },
+    extraKeys: {
+      "Ctrl-Space": "autocomplete",
+      // Tab inserts spaces instead of tab character
+      "Tab": (cm) => {
+        if (cm.somethingSelected()) {
+          cm.indentSelection("add");
+        } else {
+          cm.replaceSelection("  ", "end");
+        }
+      },
+    },
   });
 
   let debounceTimer = null;
@@ -50,13 +61,19 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     const lineText = cm.getLine(cursor.line);
     const beforeCursor = lineText.slice(0, cursor.ch);
 
-    // Trigger on variable reference: user typed "{"
-    if (beforeCursor.endsWith("{{ ") || beforeCursor.match(/\{\{\s*\w+$/)) {
+    // Trigger on variable reference: user typed {{ or is typing a var name
+    if (beforeCursor.match(/\{\{\s*[\w_]*$/)) {
       cm.showHint({ completeSingle: false });
       return;
     }
 
-    // Trigger at key positions: line has only indent + word chars (no colon yet)
+    // Trigger after colon+space for value completion (target, protocol, etc.)
+    if (beforeCursor.match(/:\s+[\w]*$/) && beforeCursor.match(/^\s*(target|forward|masquerade|icmp_block_inversion|family|action|protocol|ipv)\s*:/)) {
+      cm.showHint({ completeSingle: false });
+      return;
+    }
+
+    // Trigger at key positions: line has only indent + optional `- ` + word chars (no colon)
     if (beforeCursor.match(/^\s*(-\s+)?[\w_]+$/) && !beforeCursor.includes(":")) {
       cm.showHint({ completeSingle: false });
     }

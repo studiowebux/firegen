@@ -10,12 +10,22 @@ import { SAMPLE_YAML } from "./sample.mjs";
 function init() {
   const editorContainer = document.getElementById("editor-container");
   const errorBar = document.getElementById("editor-errors");
+  const errorText = errorBar.querySelector(".error-bar-text");
+  const errorToggle = errorBar.querySelector(".error-bar-toggle");
+  const errorDetails = errorBar.querySelector(".error-bar-details");
   const themeToggle = document.getElementById("theme-toggle");
   const btnExample = document.getElementById("btn-example");
   const btnImport = document.getElementById("btn-import");
   const btnExport = document.getElementById("btn-export");
   const btnCopy = document.getElementById("btn-copy");
   const fileImport = document.getElementById("file-import");
+
+  // Error bar toggle
+  errorToggle.addEventListener("click", () => {
+    const expanded = errorDetails.hidden;
+    errorDetails.hidden = !expanded;
+    errorToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
 
   // Initialize tabs (must happen before editor so output CodeMirrors exist)
   initTabs({
@@ -76,6 +86,28 @@ function init() {
   });
 
   /**
+   * Show errors/warnings in the collapsible error bar.
+   */
+  function showErrorBar(messages, isError) {
+    const count = messages.length;
+    const label = isError ? "error" : "warning";
+    const first = messages[0];
+
+    if (count === 1) {
+      errorText.textContent = first;
+      errorToggle.hidden = true;
+    } else {
+      errorText.textContent = `${first} (+${count - 1} more ${label}${count > 2 ? "s" : ""})`;
+      errorToggle.hidden = false;
+    }
+
+    errorDetails.textContent = messages.join("\n");
+    errorDetails.hidden = true;
+    errorToggle.setAttribute("aria-expanded", "false");
+    errorBar.hidden = false;
+  }
+
+  /**
    * Handle YAML editor content changes.
    * Parse, expand templates, generate commands, update output tabs.
    */
@@ -84,19 +116,17 @@ function init() {
 
     // Display errors
     if (errors.length > 0) {
-      errorBar.textContent = errors.join("\n");
-      errorBar.hidden = false;
+      showErrorBar(errors, true);
       setTabContent("apply", "# Errors in configuration — fix YAML to generate commands");
       setTabContent("remove", "# Errors in configuration — fix YAML to generate commands");
       return;
     }
 
-    // Display warnings inline as comments
+    // Display warnings
     let warningHeader = "";
     if (warnings.length > 0) {
       warningHeader = warnings.map((w) => `# WARNING: ${w}`).join("\n") + "\n\n";
-      errorBar.textContent = warnings.join("\n");
-      errorBar.hidden = false;
+      showErrorBar(warnings, false);
     } else {
       errorBar.hidden = true;
     }
