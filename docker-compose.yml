@@ -12,7 +12,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost/"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/"]
       interval: 30s
       timeout: 3s
       start_period: 5s
