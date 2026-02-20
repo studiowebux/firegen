@@ -4,7 +4,7 @@ import { initEditor } from "./editor.mjs";
 import { parseConfig } from "./parser.mjs";
 import { generateApply, generateRemove } from "./generator.mjs";
 import { initTabs, setTabContent, getActiveTabContent, setOutputTheme } from "./tabs.mjs";
-import { exportYaml, setupImport } from "./import-export.mjs";
+import { exportYaml, setupImport, setupBashImport } from "./import-export.mjs";
 import { SAMPLE_YAML } from "./sample.mjs";
 
 function init() {
@@ -17,6 +17,7 @@ function init() {
   const btnExample = document.getElementById("btn-example");
   const btnImport = document.getElementById("btn-import");
   const btnExport = document.getElementById("btn-export");
+  const btnPasteCommands = document.getElementById("btn-paste-commands");
   const btnCopy = document.getElementById("btn-copy");
   const fileImport = document.getElementById("file-import");
 
@@ -43,12 +44,13 @@ function init() {
   // Process the initial sample
   handleYamlChange(SAMPLE_YAML);
 
-  // Theme toggle
+  // Theme toggle with persistence
   themeToggle.addEventListener("click", () => {
     const html = document.documentElement;
     const isDark = html.getAttribute("data-theme") === "dark";
     const newTheme = isDark ? "light" : "dark";
     html.setAttribute("data-theme", newTheme);
+    localStorage.setItem("firegen-theme", newTheme);
     editor.setTheme(newTheme === "dark");
     setOutputTheme(newTheme === "dark");
   });
@@ -66,6 +68,21 @@ function init() {
   setupImport(fileImport, (content) => {
     editor.setValue(content);
   });
+
+  // Bash import
+  setupBashImport(
+    {
+      btnOpen: btnPasteCommands,
+      modal: document.getElementById("bash-import-modal"),
+      textarea: document.getElementById("bash-import-textarea"),
+      btnImport: document.getElementById("bash-import-submit"),
+      btnCancel: document.getElementById("bash-import-cancel"),
+      status: document.getElementById("bash-import-status"),
+    },
+    (yaml) => {
+      editor.setValue(yaml);
+    }
+  );
 
   // Export
   btnExport.addEventListener("click", () => {
@@ -87,11 +104,12 @@ function init() {
 
   /**
    * Show errors/warnings in the collapsible error bar.
+   * Accepts structured objects with .message property.
    */
   function showErrorBar(messages, isError) {
     const count = messages.length;
     const label = isError ? "error" : "warning";
-    const first = messages[0];
+    const first = messages[0].message;
 
     if (count === 1) {
       errorText.textContent = first;
@@ -101,7 +119,7 @@ function init() {
       errorToggle.hidden = false;
     }
 
-    errorDetails.textContent = messages.join("\n");
+    errorDetails.textContent = messages.map((m) => m.message).join("\n");
     errorDetails.hidden = true;
     errorToggle.setAttribute("aria-expanded", "false");
     errorBar.hidden = false;
@@ -109,10 +127,18 @@ function init() {
 
   /**
    * Handle YAML editor content changes.
-   * Parse, expand templates, generate commands, update output tabs.
+   * Parse, expand templates, generate commands, update output tabs and markers.
    */
   function handleYamlChange(yamlString) {
+    editor.clearMarkers();
+
     const { config, errors, warnings } = parseConfig(yamlString);
+
+    // Collect markers from errors and warnings with known line numbers
+    const markers = [...errors, ...warnings].filter((m) => m.line !== null);
+    if (markers.length > 0) {
+      editor.setMarkers(markers);
+    }
 
     // Display errors
     if (errors.length > 0) {
@@ -125,7 +151,7 @@ function init() {
     // Display warnings
     let warningHeader = "";
     if (warnings.length > 0) {
-      warningHeader = warnings.map((w) => `# WARNING: ${w}`).join("\n") + "\n\n";
+      warningHeader = warnings.map((w) => `# WARNING: ${w.message}`).join("\n") + "\n\n";
       showErrorBar(warnings, false);
     } else {
       errorBar.hidden = true;

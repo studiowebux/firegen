@@ -28,7 +28,8 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     tabSize: 2,
     indentWithTabs: false,
     indentUnit: 2,
-    placeholder: "# Enter your firewalld YAML configuration here...",
+    gutters: ["CodeMirror-linenumbers", "error-gutter"],
+    placeholder: "# Enter your firegen YAML configuration here...",
     extraKeys: {
       "Ctrl-Space": "autocomplete",
       // Tab inserts spaces instead of tab character
@@ -79,6 +80,9 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     }
   });
 
+  // Track lines with classes so clearMarkers can remove them
+  let markedLines = [];
+
   return {
     getValue() {
       return editorInstance.getValue();
@@ -91,6 +95,27 @@ export function initEditor(container, { value = "", onChange = null, debounceMs 
     },
     refresh() {
       editorInstance.refresh();
+    },
+    /** Set gutter markers and line highlights for errors/warnings. */
+    setMarkers(markers) {
+      for (const { line, severity } of markers) {
+        const dot = document.createElement("div");
+        dot.className = severity === "error" ? "gutter-error" : "gutter-warning";
+        dot.title = markers.filter((m) => m.line === line).map((m) => m.message).join("\n");
+        editorInstance.setGutterMarker(line, "error-gutter", dot);
+
+        const lineClass = severity === "error" ? "cm-error-line" : "cm-warning-line";
+        editorInstance.addLineClass(line, "wrap", lineClass);
+        markedLines.push({ line, lineClass });
+      }
+    },
+    /** Remove all gutter markers and line highlights. */
+    clearMarkers() {
+      editorInstance.clearGutter("error-gutter");
+      for (const { line, lineClass } of markedLines) {
+        editorInstance.removeLineClass(line, "wrap", lineClass);
+      }
+      markedLines = [];
     },
   };
 }
