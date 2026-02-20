@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-19
+
+### Added
+
+- Bash-to-YAML reverse import: paste `firewall-cmd` commands and convert them to YAML configuration
+- Reverse parser supporting all zone commands, direct rules, rich rules, forward ports, and ICMP blocks
+- "Paste Commands" button in editor toolbar with modal overlay for pasting shell scripts
+- Handles both `--add-*` and `--remove-*` command variants
+- Skips comments, shebang lines, blank lines, and reload commands
+- Strips `sudo` prefix automatically
+
 ## [1.0.0] - 2026-02-16
 
 ### Added
@@ -27,5 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Responsive layout for desktop and mobile
 - Docker deployment with nginx
 
-[Unreleased]: https://github.com/studiowebux/firegen/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/studiowebux/firegen/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/studiowebux/firegen/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/studiowebux/firegen/releases/tag/v1.0.0
