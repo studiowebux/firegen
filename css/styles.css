@@ -207,6 +207,46 @@ body {
   background: var(--surface);
 }
 
+/* Error gutter and line markers */
+
+.error-gutter {
+  width: 0.5rem;
+}
+
+.gutter-error,
+.gutter-warning {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin: 0.55rem auto 0;
+}
+
+.gutter-error {
+  background: var(--error);
+}
+
+.gutter-warning {
+  background: #d97706;
+}
+
+[data-theme="dark"] .gutter-warning {
+  background: #f59e0b;
+}
+
+.cm-error-line {
+  background: var(--error-bg) !important;
+}
+
+.cm-warning-line {
+  background: #fffbeb !important;
+}
+
+[data-theme="dark"] .cm-warning-line {
+  background: #1a1500 !important;
+}
+
+/* Error bar */
+
 .error-bar {
   background: var(--error-bg);
   color: var(--error);

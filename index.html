@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Firegen</title>
 
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("firegen-theme") || "light");</script>
   <link rel="stylesheet" href="vendor/codemirror-5/codemirror.min.css">
   <link rel="stylesheet" href="vendor/codemirror-5/theme/monokai.min.css">
   <link rel="stylesheet" href="vendor/codemirror-5/addon/hint/show-hint.min.css">
