@@ -1,6 +1,7 @@
 services:
   firegen:
     build: .
+    image: localhost:5000/firegen:latest
     container_name: firegen
     restart: unless-stopped
     environment:
