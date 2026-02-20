@@ -4,7 +4,7 @@ import { initEditor } from "./editor.mjs";
 import { parseConfig } from "./parser.mjs";
 import { generateApply, generateRemove } from "./generator.mjs";
 import { initTabs, setTabContent, getActiveTabContent, setOutputTheme } from "./tabs.mjs";
-import { exportYaml, setupImport } from "./import-export.mjs";
+import { exportYaml, setupImport, setupBashImport } from "./import-export.mjs";
 import { SAMPLE_YAML } from "./sample.mjs";
 
 function init() {
@@ -17,6 +17,7 @@ function init() {
   const btnExample = document.getElementById("btn-example");
   const btnImport = document.getElementById("btn-import");
   const btnExport = document.getElementById("btn-export");
+  const btnPasteCommands = document.getElementById("btn-paste-commands");
   const btnCopy = document.getElementById("btn-copy");
   const fileImport = document.getElementById("file-import");
 
@@ -67,6 +68,21 @@ function init() {
   setupImport(fileImport, (content) => {
     editor.setValue(content);
   });
+
+  // Bash import
+  setupBashImport(
+    {
+      btnOpen: btnPasteCommands,
+      modal: document.getElementById("bash-import-modal"),
+      textarea: document.getElementById("bash-import-textarea"),
+      btnImport: document.getElementById("bash-import-submit"),
+      btnCancel: document.getElementById("bash-import-cancel"),
+      status: document.getElementById("bash-import-status"),
+    },
+    (yaml) => {
+      editor.setValue(yaml);
+    }
+  );
 
   // Export
   btnExport.addEventListener("click", () => {
