@@ -86,6 +86,9 @@
       <textarea id="bash-import-textarea" class="modal-textarea" rows="15" placeholder="Paste firewall-cmd commands here...&#10;&#10;firewall-cmd --permanent --zone=public --add-service=http&#10;firewall-cmd --permanent --zone=public --add-port=8080/tcp"></textarea>
       <div id="bash-import-status" class="modal-status" hidden></div>
       <div class="modal-actions">
+        <label class="toggle-label">
+          <input type="checkbox" id="bash-import-merge"> Merge
+        </label>
         <button id="bash-import-submit" class="btn btn-sm">Import</button>
       </div>
     </div>
