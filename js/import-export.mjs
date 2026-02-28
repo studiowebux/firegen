@@ -208,10 +208,9 @@ export function setupImport(fileInput, onLoad) {
  * @param {function} getEditorYaml - returns current editor YAML string (for merge mode)
  */
 export function setupBashImport(elements, onImport, getEditorYaml) {
-  const { btnOpen, modal, textarea, btnImport, btnCancel, status, mergeCheckbox } = elements;
+  const { btnOpen, modal, textarea, btnImport, btnCancel, status } = elements;
 
   function openModal() {
-    textarea.value = "";
     status.hidden = true;
     status.textContent = "";
     modal.hidden = false;
@@ -268,10 +267,9 @@ export function setupBashImport(elements, onImport, getEditorYaml) {
       return;
     }
 
+    // Always merge with existing editor content
     let finalConfig = config;
-
-    // Merge mode: combine with existing editor content
-    if (mergeCheckbox && mergeCheckbox.checked && getEditorYaml) {
+    if (getEditorYaml) {
       const existingYaml = getEditorYaml();
       if (existingYaml && existingYaml.trim()) {
         try {
@@ -280,7 +278,7 @@ export function setupBashImport(elements, onImport, getEditorYaml) {
             finalConfig = mergeConfigs(existing, config);
           }
         } catch {
-          // Existing YAML is invalid — fall through to replace mode
+          // Existing YAML is invalid — replace instead
         }
       }
     }

@@ -82,7 +82,6 @@ function init() {
       btnImport: document.getElementById("bash-import-submit"),
       btnCancel: document.getElementById("bash-import-cancel"),
       status: document.getElementById("bash-import-status"),
-      mergeCheckbox: document.getElementById("bash-import-merge"),
     },
     (yaml) => {
       editor.setValue(yaml);
