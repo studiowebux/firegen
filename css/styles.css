@@ -358,8 +358,8 @@ body {
 }
 
 .toggle-label input[type="checkbox"]:checked {
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--text-secondary);
+  border-color: var(--text-secondary);
 }
 
 .toggle-label input[type="checkbox"]:checked::after {
