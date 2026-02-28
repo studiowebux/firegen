@@ -19,7 +19,11 @@ function init() {
   const btnExport = document.getElementById("btn-export");
   const btnPasteCommands = document.getElementById("btn-paste-commands");
   const btnCopy = document.getElementById("btn-copy");
+  const optRuntime = document.getElementById("opt-runtime");
   const fileImport = document.getElementById("file-import");
+
+  // Restore runtime toggle preference
+  optRuntime.checked = localStorage.getItem("firegen-runtime") === "true";
 
   // Error bar toggle
   errorToggle.addEventListener("click", () => {
@@ -90,6 +94,12 @@ function init() {
     exportYaml(yaml);
   });
 
+  // Runtime toggle
+  optRuntime.addEventListener("change", () => {
+    localStorage.setItem("firegen-runtime", optRuntime.checked);
+    handleYamlChange(editor.getValue());
+  });
+
   // Copy active tab
   btnCopy.addEventListener("click", () => {
     const content = getActiveTabContent();
@@ -158,8 +168,9 @@ function init() {
     }
 
     // Generate commands
-    const applyLines = generateApply(config);
-    const removeLines = generateRemove(config);
+    const genOpts = { runtime: optRuntime.checked };
+    const applyLines = generateApply(config, genOpts);
+    const removeLines = generateRemove(config, genOpts);
 
     setTabContent("apply", warningHeader + applyLines.join("\n"));
     setTabContent("remove", warningHeader + removeLines.join("\n"));

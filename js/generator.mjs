@@ -83,98 +83,98 @@ function buildRichRule(rule) {
 }
 
 /**
- * Generate zone commands for a single zone.
- * @param {string} zoneName
- * @param {object} zone - zone config
- * @param {string} op - "add" or "remove"
- * @returns {string[]} commands
+ * Emit a command, optionally adding a runtime (non-permanent) duplicate.
+ * @param {string[]} commands - output array
+ * @param {string} cmd - the permanent command
+ * @param {boolean} runtime - whether to also emit the runtime variant
+ * @param {boolean} permanentOnly - if true, skip runtime even when runtime=true
  */
-function generateZoneCommands(zoneName, zone, op) {
+function emitCommand(commands, cmd, runtime, permanentOnly) {
+  commands.push(cmd);
+  if (runtime && !permanentOnly) {
+    commands.push(cmd.replace(" --permanent", ""));
+  }
+}
+
+/**
+ * Generate zone commands with optional runtime duplication.
+ */
+function generateZoneCommandsDual(zoneName, zone, op, runtime) {
   const commands = [];
   const flag = `--${op}`;
   const perm = "--permanent";
   const z = `--zone=${zoneName}`;
 
-  // Target (only for add, no remove equivalent)
+  // Target (only for add, no remove equivalent — permanent-only)
   if (op === "add" && zone.target !== undefined) {
-    commands.push(`${CMD} ${perm} ${z} --set-target=${zone.target}`);
+    emitCommand(commands, `${CMD} ${perm} ${z} --set-target=${zone.target}`, runtime, true);
   }
 
-  // Interfaces
   if (Array.isArray(zone.interfaces)) {
     for (const iface of zone.interfaces) {
       const val = typeof iface === "object" ? iface.value : iface;
-      commands.push(`${CMD} ${perm} ${z} ${flag}-interface=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-interface=${val}`, runtime, false);
     }
   }
 
-  // Sources
   if (Array.isArray(zone.sources)) {
     for (const src of zone.sources) {
       const val = typeof src === "object" ? src.value : src;
-      commands.push(`${CMD} ${perm} ${z} ${flag}-source=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-source=${val}`, runtime, false);
     }
   }
 
-  // Services
   if (Array.isArray(zone.services)) {
     for (const svc of zone.services) {
       const val = typeof svc === "object" ? svc.value : svc;
-      commands.push(`${CMD} ${perm} ${z} ${flag}-service=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-service=${val}`, runtime, false);
     }
   }
 
-  // Ports
   if (Array.isArray(zone.ports)) {
     for (const p of zone.ports) {
       if (typeof p === "object" && p.port !== undefined) {
         const proto = p.protocol || "tcp";
-        commands.push(`${CMD} ${perm} ${z} ${flag}-port=${p.port}/${proto}`);
+        emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-port=${p.port}/${proto}`, runtime, false);
       } else {
-        commands.push(`${CMD} ${perm} ${z} ${flag}-port=${p}`);
+        emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-port=${p}`, runtime, false);
       }
     }
   }
 
-  // Protocols
   if (Array.isArray(zone.protocols)) {
     for (const proto of zone.protocols) {
       const val = typeof proto === "object" ? proto.value : proto;
-      commands.push(`${CMD} ${perm} ${z} ${flag}-protocol=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-protocol=${val}`, runtime, false);
     }
   }
 
-  // Source ports
   if (Array.isArray(zone.source_ports)) {
     for (const sp of zone.source_ports) {
       if (typeof sp === "object" && sp.port !== undefined) {
         const proto = sp.protocol || "tcp";
-        commands.push(`${CMD} ${perm} ${z} ${flag}-source-port=${sp.port}/${proto}`);
+        emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-source-port=${sp.port}/${proto}`, runtime, false);
       } else {
-        commands.push(`${CMD} ${perm} ${z} ${flag}-source-port=${sp}`);
+        emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-source-port=${sp}`, runtime, false);
       }
     }
   }
 
-  // Rich rules
   if (Array.isArray(zone.rich_rules)) {
     for (const rule of zone.rich_rules) {
       const richStr = buildRichRule(rule);
-      commands.push(`${CMD} ${perm} ${z} ${flag}-rich-rule='${richStr}'`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-rich-rule='${richStr}'`, runtime, false);
     }
   }
 
-  // Forward (IP forwarding)
   if (zone.forward === true) {
-    commands.push(`${CMD} ${perm} ${z} ${flag}-forward`);
+    emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-forward`, runtime, false);
   }
 
-  // Masquerade
   if (zone.masquerade === true) {
-    commands.push(`${CMD} ${perm} ${z} ${flag}-masquerade`);
+    emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-masquerade`, runtime, false);
   }
 
-  // Forward ports
   if (Array.isArray(zone.forward_ports)) {
     for (const fp of zone.forward_ports) {
       let val = `port=${fp.port}:proto=${fp.protocol || "tcp"}`;
@@ -184,61 +184,53 @@ function generateZoneCommands(zoneName, zone, op) {
       if (fp.to_addr) {
         val += `:toaddr=${fp.to_addr}`;
       }
-      commands.push(`${CMD} ${perm} ${z} ${flag}-forward-port=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-forward-port=${val}`, runtime, false);
     }
   }
 
-  // ICMP blocks
   if (Array.isArray(zone.icmp_blocks)) {
     for (const icmp of zone.icmp_blocks) {
       const val = typeof icmp === "object" ? icmp.value : icmp;
-      commands.push(`${CMD} ${perm} ${z} ${flag}-icmp-block=${val}`);
+      emitCommand(commands, `${CMD} ${perm} ${z} ${flag}-icmp-block=${val}`, runtime, false);
     }
   }
 
-  // ICMP block inversion (only for add)
   if (op === "add" && zone.icmp_block_inversion === true) {
-    commands.push(`${CMD} ${perm} ${z} --add-icmp-block-inversion`);
+    emitCommand(commands, `${CMD} ${perm} ${z} --add-icmp-block-inversion`, runtime, false);
   } else if (op === "remove" && zone.icmp_block_inversion === true) {
-    commands.push(`${CMD} ${perm} ${z} --remove-icmp-block-inversion`);
+    emitCommand(commands, `${CMD} ${perm} ${z} --remove-icmp-block-inversion`, runtime, false);
   }
 
   return commands;
 }
 
 /**
- * Generate direct rule commands.
- * @param {object} direct - direct config block
- * @param {string} op - "add" or "remove"
- * @returns {string[]}
+ * Generate direct rule commands with optional runtime duplication.
  */
-function generateDirectCommands(direct, op) {
+function generateDirectCommandsDual(direct, op, runtime) {
   const commands = [];
   const perm = "--permanent";
 
-  // Chains (deduplicate — rule_groups can produce duplicates)
   if (Array.isArray(direct.chains)) {
     const seen = new Set();
     for (const c of direct.chains) {
       const key = `${c.ipv} ${c.table} ${c.chain}`;
       if (!seen.has(key)) {
         seen.add(key);
-        commands.push(`${CMD} ${perm} --direct --${op}-chain ${c.ipv} ${c.table} ${c.chain}`);
+        emitCommand(commands, `${CMD} ${perm} --direct --${op}-chain ${c.ipv} ${c.table} ${c.chain}`, runtime, false);
       }
     }
   }
 
-  // Rules
   if (Array.isArray(direct.rules)) {
     for (const r of direct.rules) {
-      commands.push(`${CMD} ${perm} --direct --${op}-rule ${r.ipv} ${r.table} ${r.chain} ${r.priority} ${r.args}`);
+      emitCommand(commands, `${CMD} ${perm} --direct --${op}-rule ${r.ipv} ${r.table} ${r.chain} ${r.priority} ${r.args}`, runtime, false);
     }
   }
 
-  // Passthroughs
   if (Array.isArray(direct.passthroughs)) {
     for (const pt of direct.passthroughs) {
-      commands.push(`${CMD} ${perm} --direct --${op}-passthrough ${pt.ipv} ${pt.args}`);
+      emitCommand(commands, `${CMD} ${perm} --direct --${op}-passthrough ${pt.ipv} ${pt.args}`, runtime, false);
     }
   }
 
@@ -247,61 +239,71 @@ function generateDirectCommands(direct, op) {
 
 /**
  * Generate the Apply script: add all rules then reload.
+ * @param {object} config
+ * @param {{ runtime?: boolean }} [options]
  */
-export function generateApply(config) {
+export function generateApply(config, options) {
   if (!config) {
     return [];
   }
 
+  const runtime = options?.runtime ?? false;
   const lines = ["#!/bin/bash", "# Generated by Firegen", "# Apply script: adds all configured rules", ""];
 
   if (config.zones) {
     for (const [zoneName, zone] of Object.entries(config.zones)) {
       lines.push(`# Zone: ${zoneName}`);
-      lines.push(...generateZoneCommands(zoneName, zone, "add"));
+      lines.push(...generateZoneCommandsDual(zoneName, zone, "add", runtime));
       lines.push("");
     }
   }
 
   if (config.direct) {
     lines.push("# Direct rules");
-    lines.push(...generateDirectCommands(config.direct, "add"));
+    lines.push(...generateDirectCommandsDual(config.direct, "add", runtime));
     lines.push("");
   }
 
-  lines.push("# Reload firewalld");
-  lines.push(`${CMD} --reload`);
+  if (!runtime) {
+    lines.push("# Reload firewalld");
+    lines.push(`${CMD} --reload`);
+  }
 
   return lines;
 }
 
 /**
  * Generate the Remove script: remove all configured rules then reload.
+ * @param {object} config
+ * @param {{ runtime?: boolean }} [options]
  */
-export function generateRemove(config) {
+export function generateRemove(config, options) {
   if (!config) {
     return [];
   }
 
+  const runtime = options?.runtime ?? false;
   const lines = ["#!/bin/bash", "# Generated by Firegen", "# Remove script: removes all configured rules", ""];
 
   // Remove direct rules first (reverse order from apply)
   if (config.direct) {
     lines.push("# Remove direct rules");
-    lines.push(...generateDirectCommands(config.direct, "remove"));
+    lines.push(...generateDirectCommandsDual(config.direct, "remove", runtime));
     lines.push("");
   }
 
   if (config.zones) {
     for (const [zoneName, zone] of Object.entries(config.zones)) {
       lines.push(`# Zone: ${zoneName}`);
-      lines.push(...generateZoneCommands(zoneName, zone, "remove"));
+      lines.push(...generateZoneCommandsDual(zoneName, zone, "remove", runtime));
       lines.push("");
     }
   }
 
-  lines.push("# Reload firewalld");
-  lines.push(`${CMD} --reload`);
+  if (!runtime) {
+    lines.push("# Reload firewalld");
+    lines.push(`${CMD} --reload`);
+  }
 
   return lines;
 }

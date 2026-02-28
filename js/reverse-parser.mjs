@@ -651,12 +651,6 @@ export function parseCommands(text) {
       continue;
     }
 
-    // Skip reload commands
-    if (trimmed === "firewall-cmd --reload" || trimmed === "sudo firewall-cmd --reload") {
-      skipped.push(`Line ${i + 1}: ${trimmed}`);
-      continue;
-    }
-
     // Strip sudo prefix
     let line = trimmed;
     if (line.startsWith("sudo ")) {
@@ -669,11 +663,35 @@ export function parseCommands(text) {
       continue;
     }
 
+    // Reject lines containing shell variables
+    if (/\$(?:\w|\{|\()/.test(line)) {
+      errors.push(`Line ${i + 1}: shell variables not supported (expand variables before importing)`);
+      continue;
+    }
+
     const tokens = tokenizeLine(line);
     const { flags } = parseFlags(tokens);
 
     // Remove --permanent (irrelevant for parsing)
     delete flags.permanent;
+
+    // Skip reload commands (any firewall-cmd with --reload or --complete-reload)
+    if (flags["reload"] || flags["complete-reload"]) {
+      skipped.push(`Line ${i + 1}: reload command`);
+      continue;
+    }
+
+    // Skip non-modifying / query commands gracefully
+    const skipFlags = ["runtime-to-permanent", "check-config", "state", "version"];
+    const skipPrefixes = ["get-", "list-", "query-"];
+    const flagKeys = Object.keys(flags);
+    const isSkippable = flagKeys.some(
+      (k) => skipFlags.includes(k) || skipPrefixes.some((p) => k.startsWith(p))
+    );
+    if (isSkippable) {
+      skipped.push(`Line ${i + 1}: non-modifying command (${trimmed})`);
+      continue;
+    }
 
     // Direct commands
     if (flags.direct) {
@@ -683,8 +701,17 @@ export function parseCommands(text) {
       continue;
     }
 
-    // Zone commands
-    const zoneName = flags.zone;
+    // Zone commands — infer "public" when no --zone and command has modifying flags
+    let zoneName = flags.zone;
+    if (!zoneName) {
+      const hasModifying = flagKeys.some(
+        (k) => k.startsWith("add-") || k.startsWith("remove-") || k === "set-target"
+      );
+      if (hasModifying) {
+        zoneName = "public";
+      }
+    }
+
     if (zoneName) {
       delete flags.zone;
       const zone = ensureZone(config, zoneName);
