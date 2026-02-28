@@ -339,9 +339,33 @@ body {
 }
 
 .toggle-label input[type="checkbox"] {
-  accent-color: var(--text);
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-editor);
   margin: 0;
   cursor: pointer;
+  position: relative;
+}
+
+.toggle-label input[type="checkbox"]:checked {
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.toggle-label input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-bottom: 1.5px solid var(--bg);
+  border-right: 1.5px solid var(--bg);
+  width: 4px;
+  height: 7px;
+  transform: rotate(45deg);
+  top: 0;
+  left: 3px;
 }
 
 /* Output */
